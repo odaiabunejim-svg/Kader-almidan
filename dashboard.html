@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>كادر الميدان - لوحة الإدارة</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <style>
+        * { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { direction: rtl; }
+    </style>
+</head>
+<body class="bg-slate-900 text-white">
+    <div class="min-h-screen p-6">
+        <div class="max-w-6xl mx-auto space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-emerald-400">كادر الميدان</h1>
+                    <p class="text-slate-400">لوحة تحكم إدارة القوى الميدانية</p>
+                </div>
+                <a href="index.html" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                    <i class="fas fa-arrow-right"></i>
+                    <span>تطبيق المنسق</span>
+                </a>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-slate-800 p-6 rounded-xl border border-emerald-500/20">
+                    <p class="text-slate-400 text-sm">الزيارات الكلية</p>
+                    <h3 class="text-3xl font-bold text-emerald-400 mt-2" id="total">0</h3>
+                </div>
+                <div class="bg-slate-800 p-6 rounded-xl border border-emerald-500/20">
+                    <p class="text-slate-400 text-sm">الزيارات الناجحة</p>
+                    <h3 class="text-3xl font-bold text-emerald-400 mt-2" id="success">0</h3>
+                </div>
+                <div class="bg-slate-800 p-6 rounded-xl border border-rose-500/20">
+                    <p class="text-slate-400 text-sm">الزيارات الفاشلة</p>
+                    <h3 class="text-3xl font-bold text-rose-400 mt-2" id="failed">0</h3>
+                </div>
+                <div class="bg-slate-800 p-6 rounded-xl border border-blue-500/20">
+                    <p class="text-slate-400 text-sm">نسبة الالتزام</p>
+                    <h3 class="text-3xl font-bold text-blue-400 mt-2" id="rate">0%</h3>
+                </div>
+            </div>
+
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-6">
+                <h2 class="text-xl font-bold mb-4">آخر البصمات</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-700">
+                                <th class="text-right py-3 px-4">المنسق</th>
+                                <th class="text-right py-3 px-4">العميل</th>
+                                <th class="text-right py-3 px-4">الوقت</th>
+                                <th class="text-right py-3 px-4">المسافة</th>
+                                <th class="text-right py-3 px-4">الحالة</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table">
+                            <tr>
+                                <td colspan="5" class="py-6 text-center text-slate-400">
+                                    <i class="fas fa-spinner fa-spin"></i> جاري التحميل...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-6">
+                <h2 class="text-xl font-bold mb-4">الإحصائيات</h2>
+                <canvas id="chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://dehpydbvqlopmlvumnyk.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_MBzgBNGkU73B6gZLqNQPYA_sxloatIX';
+        const { createClient } = window.supabase;
+        const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        async function loadData() {
+            try {
+                const { data, error } = await db
+                    .from('check_ins')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(50);
+
+                if (error) throw error;
+
+                if (!data || data.length === 0) {
+                    document.getElementById('table').innerHTML = '<tr><td colspan="5" class="py-6 text-center text-slate-400">لا توجد بصمات</td></tr>';
+                    return;
+                }
+
+                const total = data.length;
+                const succ = data.filter(c => c.is_valid).length;
+                const fail = total - succ;
+                const perc = Math.round((succ / total) * 100);
+
+                document.getElementById('total').textContent = total;
+                document.getElementById('success').textContent = succ;
+                document.getElementById('failed').textContent = fail;
+                document.getElementById('rate').textContent = `${perc}%`;
+
+                const tbody = document.getElementById('table');
+                tbody.innerHTML = data.map(c => `
+                    <tr class="border-b border-slate-700 hover:bg-slate-700/50">
+                        <td class="py-3 px-4">أحمد محمود</td>
+                        <td class="py-3 px-4">سوبرماركت البركة</td>
+                        <td class="py-3 px-4 text-xs text-slate-400">${new Date(c.created_at).toLocaleString('ar-SA')}</td>
+                        <td class="py-3 px-4">${Math.round(c.distance_from_target)} م</td>
+                        <td class="py-3 px-4">
+                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${c.is_valid ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">
+                                <i class="fas ${c.is_valid ? 'fa-check-circle' : 'fa-times-circle'}"></i>
+                                ${c.is_valid ? 'ناجحة' : 'فاشلة'}
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+
+                drawChart(data);
+            } catch (e) {
+                console.error('Error:', e);
+                document.getElementById('table').innerHTML = `<tr><td colspan="5" class="py-6 text-center text-rose-400">خطأ: ${e.message}</td></tr>`;
+            }
+        }
+
+        function drawChart(data) {
+            const hourly = {};
+            data.forEach(c => {
+                const hour = new Date(c.created_at).getHours();
+                const key = `${hour}:00`;
+                if (!hourly[key]) hourly[key] = { s: 0, f: 0 };
+                if (c.is_valid) hourly[key].s++; else hourly[key].f++;
+            });
+
+            const labels = Object.keys(hourly).slice(-12);
+            const success = labels.map(l => hourly[l]?.s || 0);
+            const failed = labels.map(l => hourly[l]?.f || 0);
+
+            new Chart(document.getElementById('chart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'ناجحة', data: success, backgroundColor: '#10b981', borderRadius: 8 },
+                        { label: 'فاشلة', data: failed, backgroundColor: '#ef4444', borderRadius: 8 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { labels: { color: '#9ca3af' } } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
+                        x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
+                    }
+                }
+            });
+        }
+
+        loadData();
+        setInterval(loadData, 10000);
+    </script>
+</body>
+</html>
