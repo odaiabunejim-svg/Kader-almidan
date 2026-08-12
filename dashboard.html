@@ -27,27 +27,29 @@
                 </a>
             </div>
 
+            <!-- المؤشرات الأساسية -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div class="bg-slate-800 p-6 rounded-xl border border-emerald-500/20">
                     <p class="text-slate-400 text-sm">الزيارات الكلية</p>
-                    <h3 class="text-3xl font-bold text-emerald-400 mt-2" id="total">0</h3>
+                    <h3 class="text-3xl font-bold text-emerald-400 mt-2" id="totalVisits">0</h3>
                 </div>
                 <div class="bg-slate-800 p-6 rounded-xl border border-emerald-500/20">
                     <p class="text-slate-400 text-sm">الزيارات الناجحة</p>
-                    <h3 class="text-3xl font-bold text-emerald-400 mt-2" id="success">0</h3>
+                    <h3 class="text-3xl font-bold text-emerald-400 mt-2" id="successVisits">0</h3>
                 </div>
                 <div class="bg-slate-800 p-6 rounded-xl border border-rose-500/20">
                     <p class="text-slate-400 text-sm">الزيارات الفاشلة</p>
-                    <h3 class="text-3xl font-bold text-rose-400 mt-2" id="failed">0</h3>
+                    <h3 class="text-3xl font-bold text-rose-400 mt-2" id="failedVisits">0</h3>
                 </div>
                 <div class="bg-slate-800 p-6 rounded-xl border border-blue-500/20">
                     <p class="text-slate-400 text-sm">نسبة الالتزام</p>
-                    <h3 class="text-3xl font-bold text-blue-400 mt-2" id="rate">0%</h3>
+                    <h3 class="text-3xl font-bold text-blue-400 mt-2" id="complianceRate">0%</h3>
                 </div>
             </div>
 
+            <!-- الجدول -->
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-6">
-                <h2 class="text-xl font-bold mb-4">آخر البصمات</h2>
+                <h2 class="text-xl font-bold mb-4">آخر البصمات المسجلة</h2>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead>
@@ -59,7 +61,7 @@
                                 <th class="text-right py-3 px-4">الحالة</th>
                             </tr>
                         </thead>
-                        <tbody id="table">
+                        <tbody id="checkinsTable">
                             <tr>
                                 <td colspan="5" class="py-6 text-center text-slate-400">
                                     <i class="fas fa-spinner fa-spin"></i> جاري التحميل...
@@ -70,9 +72,10 @@
                 </div>
             </div>
 
+            <!-- الرسم البياني -->
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-6">
-                <h2 class="text-xl font-bold mb-4">الإحصائيات</h2>
-                <canvas id="chart"></canvas>
+                <h2 class="text-xl font-bold mb-4">إحصائيات الزيارات اليومية</h2>
+                <canvas id="dailyChart"></canvas>
             </div>
         </div>
     </div>
@@ -81,91 +84,155 @@
         const SUPABASE_URL = 'https://dehpydbvqlopmlvumnyk.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_MBzgBNGkU73B6gZLqNQPYA_sxloatIX';
         const { createClient } = window.supabase;
-        const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        async function loadData() {
+        async function loadCheckIns() {
             try {
-                const { data, error } = await db
+                // جلب البصمات مع ربطها بجدول المستخدمين والعملاء بناءً على المخطط الخاص بك
+                const { data, error } = await supabaseClient
                     .from('check_ins')
-                    .select('*')
+                    .select(`
+                        *,
+                        users ( full_name ),
+                        clients ( name )
+                    `)
                     .order('created_at', { ascending: false })
                     .limit(50);
 
                 if (error) throw error;
 
                 if (!data || data.length === 0) {
-                    document.getElementById('table').innerHTML = '<tr><td colspan="5" class="py-6 text-center text-slate-400">لا توجد بصمات</td></tr>';
+                    document.getElementById('checkinsTable').innerHTML = `
+                        <tr>
+                            <td colspan="5" class="py-6 text-center text-slate-400">
+                                لا توجد بصمات مسجلة حتى الآن
+                            </td>
+                        </tr>
+                    `;
                     return;
                 }
 
-                const total = data.length;
-                const succ = data.filter(c => c.is_valid).length;
-                const fail = total - succ;
-                const perc = Math.round((succ / total) * 100);
+                let totalVisits = data.length;
+                let successVisits = data.filter(c => c.is_valid).length;
+                let failedVisits = totalVisits - successVisits;
+                let complianceRate = totalVisits > 0 ? Math.round((successVisits / totalVisits) * 100) : 0;
 
-                document.getElementById('total').textContent = total;
-                document.getElementById('success').textContent = succ;
-                document.getElementById('failed').textContent = fail;
-                document.getElementById('rate').textContent = `${perc}%`;
+                document.getElementById('totalVisits').textContent = totalVisits;
+                document.getElementById('successVisits').textContent = successVisits;
+                document.getElementById('failedVisits').textContent = failedVisits;
+                document.getElementById('complianceRate').textContent = `${complianceRate}%`;
 
-                const tbody = document.getElementById('table');
-                tbody.innerHTML = data.map(c => `
-                    <tr class="border-b border-slate-700 hover:bg-slate-700/50">
-                        <td class="py-3 px-4">أحمد محمود</td>
-                        <td class="py-3 px-4">سوبرماركت البركة</td>
-                        <td class="py-3 px-4 text-xs text-slate-400">${new Date(c.created_at).toLocaleString('ar-SA')}</td>
-                        <td class="py-3 px-4">${Math.round(c.distance_from_target)} م</td>
-                        <td class="py-3 px-4">
-                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${c.is_valid ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">
-                                <i class="fas ${c.is_valid ? 'fa-check-circle' : 'fa-times-circle'}"></i>
-                                ${c.is_valid ? 'ناجحة' : 'فاشلة'}
-                            </span>
-                        </td>
-                    </tr>
-                `).join('');
+                const tableBody = document.getElementById('checkinsTable');
+                tableBody.innerHTML = data.map(checkin => {
+                    const coordinatorName = checkin.users?.full_name || 'منسق غير معروف';
+                    const clientName = checkin.clients?.name || 'عميل غير معروف';
+                    const timeField = checkin.check_in_time || checkin.created_at;
+                    const distance = checkin.distance_from_target != null ? Math.round(checkin.distance_from_target) : 0;
+
+                    return `
+                        <tr class="border-b border-slate-700 hover:bg-slate-700/50">
+                            <td class="py-3 px-4">${coordinatorName}</td>
+                            <td class="py-3 px-4">${clientName}</td>
+                            <td class="py-3 px-4 text-xs text-slate-400">
+                                ${new Date(timeField).toLocaleString('ar-SA')}
+                            </td>
+                            <td class="py-3 px-4">
+                                <span class="text-sm">${distance} م</span>
+                            </td>
+                            <td class="py-3 px-4">
+                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                                    checkin.is_valid 
+                                        ? 'bg-emerald-500/20 text-emerald-300' 
+                                        : 'bg-rose-500/20 text-rose-300'
+                                }">
+                                    <i class="fas ${checkin.is_valid ? 'fa-check-circle' : 'fa-times-circle'}"></i>
+                                    ${checkin.is_valid ? 'ناجحة' : 'فاشلة'}
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
 
                 drawChart(data);
-            } catch (e) {
-                console.error('Error:', e);
-                document.getElementById('table').innerHTML = `<tr><td colspan="5" class="py-6 text-center text-rose-400">خطأ: ${e.message}</td></tr>`;
+
+            } catch (error) {
+                console.error('Error loading check-ins:', error);
+                const errorMsg = error.message || JSON.stringify(error);
+                document.getElementById('checkinsTable').innerHTML = `
+                    <tr>
+                        <td colspan="5" class="py-6 text-center text-rose-400">
+                            خطأ في تحميل البيانات: ${errorMsg}
+                        </td>
+                    </tr>
+                `;
             }
         }
 
         function drawChart(data) {
-            const hourly = {};
-            data.forEach(c => {
-                const hour = new Date(c.created_at).getHours();
+            const hourlyData = {};
+            data.forEach(checkin => {
+                const timeField = checkin.check_in_time || checkin.created_at;
+                const date = new Date(timeField);
+                const hour = date.getHours();
                 const key = `${hour}:00`;
-                if (!hourly[key]) hourly[key] = { s: 0, f: 0 };
-                if (c.is_valid) hourly[key].s++; else hourly[key].f++;
+                if (!hourlyData[key]) {
+                    hourlyData[key] = { success: 0, failed: 0 };
+                }
+                if (checkin.is_valid) {
+                    hourlyData[key].success++;
+                } else {
+                    hourlyData[key].failed++;
+                }
             });
 
-            const labels = Object.keys(hourly).slice(-12);
-            const success = labels.map(l => hourly[l]?.s || 0);
-            const failed = labels.map(l => hourly[l]?.f || 0);
+            const labels = Object.keys(hourlyData).slice(-12);
+            const successData = labels.map(label => hourlyData[label]?.success || 0);
+            const failedData = labels.map(label => hourlyData[label]?.failed || 0);
 
-            new Chart(document.getElementById('chart').getContext('2d'), {
+            const ctx = document.getElementById('dailyChart').getContext('2d');
+            new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels,
+                    labels: labels,
                     datasets: [
-                        { label: 'ناجحة', data: success, backgroundColor: '#10b981', borderRadius: 8 },
-                        { label: 'فاشلة', data: failed, backgroundColor: '#ef4444', borderRadius: 8 }
+                        {
+                            label: 'زيارات ناجحة',
+                            data: successData,
+                            backgroundColor: '#10b981',
+                            borderRadius: 8,
+                        },
+                        {
+                            label: 'زيارات فاشلة',
+                            data: failedData,
+                            backgroundColor: '#ef4444',
+                            borderRadius: 8,
+                        }
                     ]
                 },
                 options: {
                     responsive: true,
-                    plugins: { legend: { labels: { color: '#9ca3af' } } },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#9ca3af' }
+                        }
+                    },
                     scales: {
-                        y: { beginAtZero: true, ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
-                        x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: '#9ca3af' },
+                            grid: { color: '#374151' }
+                        },
+                        x: {
+                            ticks: { color: '#9ca3af' },
+                            grid: { color: '#374151' }
+                        }
                     }
                 }
             });
         }
 
-        loadData();
-        setInterval(loadData, 10000);
+        loadCheckIns();
+        setInterval(loadCheckIns, 10000);
     </script>
 </body>
 </html>
