@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل الدخول - كادر الميدان</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { direction: rtl; }
+        .gradient-text { background: linear-gradient(135deg, #10b981 0%, #059669 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white min-h-screen flex items-center justify-center p-4">
+    
+    <div class="w-full max-w-md">
+        <!-- Logo -->
+        <div class="text-center mb-8">
+            <div class="flex items-center justify-center gap-2 mb-4">
+                <i class="fas fa-map-location-dot text-emerald-400 text-3xl"></i>
+                <h1 class="text-3xl font-bold gradient-text">كادر الميدان</h1>
+            </div>
+            <p class="text-slate-400">نظام إدارة القوى الميدانية</p>
+        </div>
+
+        <!-- Login Card -->
+        <div class="bg-slate-800/50 backdrop-blur-md border border-slate-700 rounded-2xl p-8 space-y-6">
+            <h2 class="text-2xl font-bold text-center">تسجيل الدخول</h2>
+
+            <!-- Email Input -->
+            <div>
+                <label class="block text-sm font-bold mb-2">البريد الإلكتروني</label>
+                <div class="relative">
+                    <i class="fas fa-envelope absolute right-3 top-3 text-slate-400"></i>
+                    <input 
+                        id="email"
+                        type="email" 
+                        placeholder="your@email.com"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg pr-10 pl-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                    >
+                </div>
+            </div>
+
+            <!-- Password Input -->
+            <div>
+                <label class="block text-sm font-bold mb-2">كلمة المرور</label>
+                <div class="relative">
+                    <i class="fas fa-lock absolute right-3 top-3 text-slate-400"></i>
+                    <input 
+                        id="password"
+                        type="password" 
+                        placeholder="••••••••"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg pr-10 pl-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                    >
+                </div>
+            </div>
+
+            <!-- Remember Me -->
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="remember" class="w-4 h-4">
+                <label for="remember" class="text-sm text-slate-400">تذكرني</label>
+            </div>
+
+            <!-- Error Message -->
+            <div id="errorMsg" class="hidden bg-red-500/20 border border-red-500 text-red-300 p-3 rounded-lg text-sm">
+                <i class="fas fa-exclamation-circle ml-2"></i>
+                <span id="errorText"></span>
+            </div>
+
+            <!-- Loading -->
+            <div id="loadingMsg" class="hidden bg-blue-500/20 border border-blue-500 text-blue-300 p-3 rounded-lg text-sm">
+                <i class="fas fa-spinner fa-spin ml-2"></i>
+                جاري التحقق من البيانات...
+            </div>
+
+            <!-- Login Button -->
+            <button 
+                id="loginBtn"
+                class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-lg transition-all disabled:opacity-50"
+            >
+                <i class="fas fa-sign-in-alt ml-2"></i> دخول
+            </button>
+
+
+        </div>
+
+            <div class="text-center">
+                <a href="index.html" class="text-slate-400 hover:text-slate-300 text-sm flex items-center justify-center gap-2">
+                    <i class="fas fa-arrow-right"></i>
+                    العودة للصفحة الرئيسية
+                </a>
+            </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://dehpydbvqlopmlvumnyk.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_MBzgBNGkU73B6gZLqNQPYA_sxloatIX';
+        const { createClient } = window.supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const loginBtn = document.getElementById('loginBtn');
+        const errorMsg = document.getElementById('errorMsg');
+        const errorText = document.getElementById('errorText');
+        const loadingMsg = document.getElementById('loadingMsg');
+
+        function showError(message) {
+            errorText.textContent = message;
+            errorMsg.classList.remove('hidden');
+            loadingMsg.classList.add('hidden');
+            loginBtn.disabled = false;
+        }
+
+        function showLoading() {
+            errorMsg.classList.add('hidden');
+            loadingMsg.classList.remove('hidden');
+            loginBtn.disabled = true;
+        }
+
+        loginBtn.addEventListener('click', async () => {
+            const email = emailInput.value.trim();
+            const password = passwordInput.value;
+
+            if (!email || !password) {
+                showError('الرجاء إدخال البريد الإلكتروني وكلمة المرور');
+                return;
+            }
+
+            showLoading();
+
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+
+                if (error) {
+                    showError(error.message === 'Invalid login credentials' ? 'بيانات تسجيل الدخول غير صحيحة' : error.message);
+                    return;
+                }
+
+                if (data.user) {
+                    // جلب بيانات المستخدم من جدول users
+                    const { data: userData, error: userError } = await supabaseClient
+                        .from('users')
+                        .select('*')
+                        .eq('email', email)
+                        .single();
+
+                    if (userError) {
+                        showError('خطأ في جلب بيانات المستخدم');
+                        return;
+                    }
+
+                    // حفظ البيانات في localStorage
+                    localStorage.setItem('user', JSON.stringify({
+                        id: data.user.id,
+                        email: data.user.email,
+                        name: userData.full_name,
+                        role: userData.role,
+                        company_id: userData.company_id
+                    }));
+
+                    // التوجيه حسب الدور
+                    if (userData.role === 'منسق ميداني' || userData.role === 'field_coordinator') {
+                        window.location.href = 'employee-app.html';
+                    } else if (userData.role === 'مدير' || userData.role === 'manager') {
+                        window.location.href = 'admin-dashboard.html';
+                    } else {
+                        window.location.href = 'admin-dashboard.html';
+                    }
+                }
+            } catch (err) {
+                showError('حدث خطأ: ' + err.message);
+            }
+        });
+
+        // دخول بـ Enter
+        [emailInput, passwordInput].forEach(input => {
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') loginBtn.click();
+            });
+        });
+
+        // تنظيف الأخطاء عند الكتابة
+        [emailInput, passwordInput].forEach(input => {
+            input.addEventListener('input', () => {
+                errorMsg.classList.add('hidden');
+            });
+        });
+    </script>
+</body>
+</html>
